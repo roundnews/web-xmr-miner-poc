@@ -72,6 +72,59 @@ export function EducationalPanel() {
           <li><strong>Understanding browser constraints:</strong> See real-world limitations in action</li>
         </ul>
       )
+    },
+    {
+      id: 'webgpu-vs-wasm',
+      title: 'Why WebGPU performs worse for RandomX',
+      content: (
+        <div className="space-y-3">
+          <p>RandomX is specifically designed to favor CPUs over GPUs. This tool demonstrates this through backend comparison:</p>
+          <table className="w-full text-sm border-collapse mt-3">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-2">Property</th>
+                <th className="text-left py-2">CPU (WASM)</th>
+                <th className="text-left py-2">GPU (WebGPU)</th>
+              </tr>
+            </thead>
+            <tbody className="text-xs">
+              <tr className="border-b">
+                <td className="py-2">Random memory access</td>
+                <td className="text-green-600">✓ Efficient L3 cache</td>
+                <td className="text-red-600">✗ High latency VRAM</td>
+              </tr>
+              <tr className="border-b">
+                <td className="py-2">Dynamic branching</td>
+                <td className="text-green-600">✓ Native support</td>
+                <td className="text-red-600">✗ Warp divergence</td>
+              </tr>
+              <tr className="border-b">
+                <td className="py-2">Sequential dependencies</td>
+                <td className="text-green-600">✓ Pipeline-optimized</td>
+                <td className="text-red-600">✗ Forces serialization</td>
+              </tr>
+              <tr className="border-b">
+                <td className="py-2">256MB scratchpad</td>
+                <td className="text-green-600">✓ Fits in cache hierarchy</td>
+                <td className="text-red-600">✗ Bandwidth constrained</td>
+              </tr>
+              <tr className="border-b">
+                <td className="py-2">CPU↔GPU transfers</td>
+                <td className="text-green-600">✓ Not needed</td>
+                <td className="text-red-600">✗ Major overhead</td>
+              </tr>
+            </tbody>
+          </table>
+          <div className="mt-3 p-3 bg-muted/50 rounded-lg">
+            <p className="font-medium">Expected Results:</p>
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              <li>WASM (CPU): 10-200 H/s</li>
+              <li>WebGPU (GPU): 1-20 H/s (significantly slower!)</li>
+            </ul>
+            <p className="mt-2 text-xs text-muted-foreground">This demonstrates Monero's design goal: keeping mining accessible to consumer CPUs.</p>
+          </div>
+        </div>
+      )
     }
   ];
 

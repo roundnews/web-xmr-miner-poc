@@ -7,6 +7,7 @@ An educational web application that demonstrates browser-based Monero (XMR) mini
 This is an **educational proof-of-concept** that shows:
 - How browsers can perform parallel computing using Web Workers
 - RandomX algorithm characteristics (memory-hard, CPU-optimized)
+- **WebGPU vs WASM backend comparison** (demonstrates why GPUs are inefficient for RandomX)
 - Real-time performance telemetry and monitoring
 - CPU resource management through throttling
 - Browser computing constraints and limitations
@@ -28,6 +29,7 @@ This is an **educational proof-of-concept** that shows:
 
 ### 🎛️ Full User Control
 - Configurable worker threads (1-8)
+- **Backend selection** (WASM CPU or WebGPU GPU)
 - CPU throttle control (0-90%)
 - Duration presets (15s, 60s, 5min)
 - Immediate Stop button
@@ -37,6 +39,7 @@ This is an **educational proof-of-concept** that shows:
 - Total hashes computed
 - Peak and average hashrate
 - Per-worker status monitoring
+- **Backend indicator** (WASM/WebGPU)
 - Elapsed time tracking
 - **Solutions found** (demonstrates difficulty checking)
 - **Cache reinitializations** (shows realistic mining interruptions)
@@ -49,6 +52,8 @@ This is an **educational proof-of-concept** that shows:
 
 ### 📚 Educational Content
 - Explanations of Web Workers
+- **WebGPU vs WASM performance comparison**
+- **Why RandomX favors CPUs over GPUs**
 - Browser constraint documentation
 - Safety tips and best practices
 - Use case examples
@@ -64,6 +69,7 @@ This is an **educational proof-of-concept** that shows:
 
 2. **Web Workers**
    - Initialize RandomX with 256MB memory scratchpad
+   - **Two backends available**: WASM (CPU) or WebGPU (GPU)
    - Run RandomX hash computations in parallel
    - Implement duty-cycle throttling (work/sleep)
    - Report statistics at regular intervals
@@ -72,7 +78,8 @@ This is an **educational proof-of-concept** that shows:
    - Memory-hard: Uses 256MB scratchpad (light mode)
    - CPU-intensive: Multiple hashing rounds with VM simulation
    - Initialization: 2-5 second cache setup
-   - Performance: ~10-200 H/s (much slower than SHA256 by design)
+   - Performance: ~10-200 H/s with WASM, ~1-20 H/s with WebGPU
+   - **Backend Comparison**: WebGPU demonstrates why GPUs are inefficient for RandomX
    - **Realistic Mining Components:**
      - **Block Headers**: 76-byte Monero-style headers with binary serialization
      - **Sequential Nonce**: Workers iterate through partitioned nonce spaces
@@ -112,6 +119,13 @@ This is an **educational proof-of-concept** that shows:
 - **Initialization**: Workers need 2-5 seconds to initialize before hashing begins
 - **Performance**: Expect 10-200 H/s total (vs 100K-1M+ H/s with previous SHA256)
 
+### WebGPU Backend Requirements
+
+- **WebGPU Support**: Chrome/Edge 113+, Safari 18+ (experimental)
+- **GPU Memory**: Sufficient VRAM for 256MB+ buffers
+- **Note**: WebGPU backend is **intentionally slower** than WASM to demonstrate RandomX's CPU-friendly design
+- **Educational Purpose**: Use WebGPU to understand why GPUs are inefficient for RandomX
+
 ## Usage Guide
 
 ### Quick Start
@@ -120,6 +134,7 @@ This is an **educational proof-of-concept** that shows:
 2. **Check the consent box** - Required to enable controls
 3. **Configure settings:**
    - Start with 1-2 threads
+   - **Choose backend**: WASM (CPU) recommended, WebGPU (GPU) for educational comparison
    - Use 30% throttle initially
    - Select 15-60 second duration
 4. **Click Start** - Watch real-time metrics
@@ -156,13 +171,23 @@ This is an **educational proof-of-concept** that shows:
 
 ### Typical Performance Ranges
 
-**RandomX (Current Implementation)**
+**RandomX WASM Backend (CPU-Optimized)**
 
 | Device Type | Threads | Approx. Hashrate (H/s) | Memory Usage |
 |-------------|---------|------------------------|--------------|
 | Mobile | 1-2 | 5-20 | 258-516MB |
 | Laptop | 2-4 | 20-100 | 516MB-1GB |
 | Desktop | 4-8 | 50-200 | 1-2GB |
+
+**RandomX WebGPU Backend (GPU - Educational)**
+
+| Device Type | Threads | Approx. Hashrate (H/s) | Memory Usage |
+|-------------|---------|------------------------|--------------|
+| Mobile | 1 | 1-5 | 258MB |
+| Laptop | 1-2 | 5-20 | 258-516MB |
+| Desktop | 1-2 | 10-40 | 258-516MB |
+
+**Note**: WebGPU is intentionally 2-10x slower than WASM, demonstrating RandomX's CPU-friendly design.
 
 **Previous SHA256 Implementation** (for comparison)
 
@@ -242,6 +267,7 @@ This tool exists to:
 - **Frontend:** React + TypeScript
 - **Workers:** Vanilla JavaScript Web Workers
 - **Hashing:** RandomX-Lite simulation (memory-hard algorithm)
+- **Backends:** WASM (CPU) and WebGPU (GPU) implementations
 - **UI:** shadcn/ui + Tailwind CSS
 - **Icons:** Phosphor Icons
 
@@ -249,19 +275,22 @@ This tool exists to:
 ```
 /public
   /wasm
-    randomx.js             # RandomX simulation module
-  hash-worker.js           # Web Worker implementation
+    randomx.js             # RandomX WASM simulation module
+    randomx-webgpu.js      # RandomX WebGPU implementation
+  hash-worker.js           # WASM Web Worker implementation
+  hash-worker-webgpu.js    # WebGPU Web Worker implementation
+  block-header.js          # Block header utilities
 /src
   /components
     ConsentGate.tsx        # User consent UI
-    ControlPanel.tsx       # Benchmark controls
-    TelemetryDashboard.tsx # Live metrics
+    ControlPanel.tsx       # Benchmark controls (with backend selector)
+    TelemetryDashboard.tsx # Live metrics (shows backend)
     ReportExport.tsx       # Result export
-    EducationalPanel.tsx   # Information sections
+    EducationalPanel.tsx   # Information sections (includes WebGPU comparison)
   /lib
-    coordinator.ts         # Worker management
+    coordinator.ts         # Worker management (backend selection)
     types.ts              # TypeScript interfaces
-  App.tsx                 # Main application
+  App.tsx                 # Main application (WebGPU detection)
 ```
 
 ### Worker Communication Protocol
