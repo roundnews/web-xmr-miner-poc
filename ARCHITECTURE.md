@@ -86,7 +86,10 @@ getAggregatedStats(): AggregatedStats
 **Responsibilities:**
 - RandomX module initialization
 - Memory scratchpad management (256MB light mode)
-- RandomX hash computation
+- RandomX hash computation with realistic mining components
+- Block header management and nonce iteration
+- Difficulty checking on every hash
+- Cache reinitialization (every 2 minutes)
 - Duty-cycle throttling implementation
 - Statistics reporting
 - Memory usage tracking
@@ -96,7 +99,7 @@ getAggregatedStats(): AggregatedStats
 
 **Incoming:**
 ```javascript
-{ type: 'INIT', data: { workerId: number } }
+{ type: 'INIT', data: { workerId: number, totalWorkers: number } }
 { type: 'START', data: { config: { throttle, statsInterval } } }
 { type: 'STOP' }
 { type: 'UPDATE_CONFIG', data: { throttle } }
@@ -107,7 +110,8 @@ getAggregatedStats(): AggregatedStats
 ```javascript
 { type: 'INIT_PROGRESS', workerId, progress, message, memoryInfo }
 { type: 'READY', workerId, capabilities: { randomx, wasmSupport, mode, memoryMB } }
-{ type: 'STATS', workerId, hashesDelta, elapsedMs, totalHashes, hashrate, dutyCycle, memoryUsageMB }
+{ type: 'STATS', workerId, hashesDelta, elapsedMs, totalHashes, hashrate, dutyCycle, 
+  memoryUsageMB, solutionsFound, cacheReinitCount }
 { type: 'ERROR', workerId, error, details }
 { type: 'STOPPED', workerId, totalHashes }
 { type: 'DESTROYED', workerId }
@@ -131,25 +135,61 @@ async function initializeRandomX() {
   // 5. Complete initialization
   // Report: INIT_PROGRESS (100%, "RandomX initialized")
   
-  // 6. Send READY message with capabilities
+  // 6. Partition nonce space for this worker
+  const { nonceStart, nonceEnd } = partitionNonceSpace(workerId, totalWorkers)
+  
+  // 7. Create block header template
+  blockTemplate = new BlockHeader(version, prevHash, merkleRoot, timestamp, nonce)
+  
+  // 8. Set difficulty target
+  difficultyTarget = BigInt('0x00000000FFFF0000...')
+  
+  // 9. Send READY message with capabilities
 }
 ```
 
-**Hashing Loop:**
+**Hashing Loop (Realistic Mining):**
 ```javascript
 while (running) {
+  // Check for cache reinitialization (every 2 minutes)
+  if (now - lastCacheReinit >= 120000) {
+    await randomxModule.init(generateNewSeed())
+    cacheReinitCount++
+    blockTemplate.updateTimestamp(now)
+  }
+  
   // Work phase
   for (workMs duration) {
-    // Calculate RandomX hash (slow, memory-intensive)
-    await randomxHash(randomInput)
+    // Set sequential nonce in block header
+    blockTemplate.setNonce(nonce)
+    
+    // Serialize block header to binary (76 bytes)
+    const headerBytes = blockTemplate.serialize()
+    
+    // Calculate RandomX hash on binary header
+    const hash = await randomxHash(headerBytes)
+    
+    // Compare against difficulty target (realistic overhead)
+    const hashValue = BigInt('0x' + hash)
+    if (hashValue < difficultyTarget) {
+      console.log(`Worker ${workerId} found solution at nonce ${nonce}`)
+      solutionsFound++
+    }
+    
+    // Increment nonce sequentially
+    nonce++
+    if (nonce >= nonceEnd) nonce = nonceStart  // Wrap around partition
+    
     totalHashes++
   }
   
-  // Stats reporting (includes memory usage)
+  // Stats reporting (includes new metrics)
   if (statsInterval elapsed) {
     postMessage({ 
       type: 'STATS',
       memoryUsageMB: randomxModule.getMemoryInfo().totalMB,
+      solutionsFound,
+      cacheReinitCount,
       ...
     })
   }
@@ -159,13 +199,65 @@ while (running) {
 }
 ```
 
-### 3. RandomX Module (`/public/wasm/randomx.js`)
+### 3. Block Header Module (`/public/block-header.js`)
+
+**Responsibilities:**
+- Monero-style block header structure (76 bytes)
+- Binary serialization using Uint8Array
+- Nonce space partitioning for multi-worker mining
+- Block template management
+- Helper utilities for merkle root and seed generation
+
+**Block Header Structure (76 bytes):**
+```
+Offset | Size | Field
+-------|------|------------------
+0      | 4    | Version (uint32)
+4      | 4    | Timestamp (uint32)
+8      | 32   | Previous Hash
+40     | 4    | Nonce (uint32)
+44     | 32   | Merkle Root
+```
+
+**Key Functions:**
+
+```javascript
+class BlockHeader {
+  constructor(version, prevHash, merkleRoot, timestamp, nonce)
+  setNonce(nonce)           // Update nonce for next iteration
+  updateTimestamp(ts)        // Refresh timestamp (on cache reinit)
+  serialize()               // Return Uint8Array(76) for hashing
+}
+
+function partitionNonceSpace(workerId, totalWorkers) {
+  // Returns: { nonceStart, nonceEnd }
+  // Worker 0: 0 to MAX_UINT32 / totalWorkers
+  // Worker 1: (MAX_UINT32 / totalWorkers) to (2 * MAX_UINT32 / totalWorkers)
+  // Ensures no nonce overlap between workers
+}
+
+function generateMerkleRoot()  // Random 32-byte merkle root
+function generateNewSeed()     // New seed for cache reinitialization
+```
+
+**Nonce Partitioning Example (4 workers):**
+```
+Worker 0: 0x00000000 to 0x3FFFFFFF (1,073,741,823)
+Worker 1: 0x40000000 to 0x7FFFFFFF (2,147,483,647)
+Worker 2: 0x80000000 to 0xBFFFFFFF (3,221,225,471)
+Worker 3: 0xC0000000 to 0xFFFFFFFF (4,294,967,295)
+```
+
+This ensures each worker searches a unique portion of the nonce space without overlap, mimicking real distributed mining.
+
+### 4. RandomX Module (`/public/wasm/randomx.js`)
 
 **Responsibilities:**
 - Memory scratchpad allocation (256MB)
 - Cache generation and initialization
 - Scratchpad filling and mixing
 - Hash calculation with VM simulation
+- Support for both Uint8Array and string inputs
 - Memory management and cleanup
 
 **Key Components:**
@@ -179,18 +271,20 @@ while (running) {
    - Initialized from seed using SHA-256
    - Used to derive scratchpad contents
    - Simulates Argon2d behavior
+   - Reinitializes every 2 minutes (realistic blockchain height changes)
 
 3. **Hash Calculation**
    - 8 rounds of VM execution simulation
    - Scratchpad mixing (memory-hard)
    - Multiple SHA-256 operations (CPU-intensive)
+   - **Accepts Uint8Array or string inputs** (supports binary block headers)
    - Returns 32-byte hash
 
 **API:**
 ```javascript
 class RandomXModule {
   async init(seedKey)                    // Initialize with seed
-  async calculateHash(input)             // Calculate hash
+  async calculateHash(input)             // Calculate hash (Uint8Array or string)
   getMemoryInfo()                        // Get memory usage stats
   destroy()                              // Release memory
 }
