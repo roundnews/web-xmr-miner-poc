@@ -13,7 +13,9 @@ let blockTemplate = null;
 let nonce = 0;
 let nonceStart = 0;
 let nonceEnd = 0;
-let difficultyTarget = BigInt(0);
+// Difficulty target: Finding solutions roughly every 10-100M hashes
+// Adjusted to be achievable within reasonable benchmark duration
+const DIFFICULTY_TARGET = BigInt('0x00000000FFFF0000000000000000000000000000000000000000000000000000');
 let solutionsFound = 0;
 let cacheReinitCount = 0;
 let lastCacheReinit = 0;
@@ -122,11 +124,16 @@ async function hashingLoop(config) {
       const hash = await randomxHash(headerBytes);
       
       // Compare against difficulty (adds realistic overhead)
-      const hashValue = BigInt('0x' + hash);
-      if (hashValue < difficultyTarget) {
-        // Found solution (log but don't stop - educational)
-        console.log(`Worker ${workerId} found solution at nonce ${nonce}, hash: ${hash}`);
-        solutionsFound++;
+      try {
+        const hashValue = BigInt('0x' + hash);
+        if (hashValue < DIFFICULTY_TARGET) {
+          // Found solution (log but don't stop - educational)
+          console.log(`Worker ${workerId} found solution at nonce ${nonce}, hash: ${hash}`);
+          solutionsFound++;
+        }
+      } catch (error) {
+        // Handle malformed hash (should not happen with valid randomxHash output)
+        console.error(`Worker ${workerId}: Invalid hash format: ${hash}`);
       }
       
       // Increment nonce sequentially
@@ -194,11 +201,6 @@ self.onmessage = async function(e) {
           Math.floor(Date.now() / 1000),  // timestamp
           0  // initial nonce
         );
-        
-        // Set realistic difficulty target
-        // This target will find solutions roughly every 10-100 million hashes
-        // Adjusted to be achievable within reasonable benchmark duration
-        difficultyTarget = BigInt('0x00000000FFFF0000000000000000000000000000000000000000000000000000');
         
         console.log(`Worker ${workerId}: Nonce range ${nonceStart} to ${nonceEnd}`);
         
