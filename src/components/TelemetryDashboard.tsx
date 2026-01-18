@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AggregatedStats, WorkerInfo } from '@/lib/types';
-import { Cpu, ChartLine, Clock } from '@phosphor-icons/react';
+import { Cpu, ChartLine, Clock, CheckCircle, ArrowsClockwise } from '@phosphor-icons/react';
 
 interface MetricCardProps {
   label: string;
@@ -107,6 +107,18 @@ export function TelemetryDashboard({ stats, workers, isRunning }: TelemetryDashb
             value={`${stats.runningWorkers} / ${workers.length}`}
             icon={<Cpu />}
             subtext={stats.erroredWorkers > 0 ? `${stats.erroredWorkers} errors` : 'All operational'}
+          />
+          <MetricCard
+            label="Solutions Found"
+            value={(stats.totalSolutions || 0).toLocaleString()}
+            icon={<CheckCircle />}
+            subtext="Difficulty targets met"
+          />
+          <MetricCard
+            label="Cache Reinits"
+            value={(stats.totalCacheReinits || 0).toLocaleString()}
+            icon={<ArrowsClockwise />}
+            subtext="Every 2 minutes (realistic)"
           />
         </div>
 

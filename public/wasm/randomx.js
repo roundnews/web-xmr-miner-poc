@@ -167,7 +167,11 @@ class RandomXModule {
       throw new Error('RandomX not initialized. Call init() first.');
     }
 
-    const inputBytes = this.stringToBytes(input);
+    // Support both Uint8Array and string inputs
+    const inputBytes = input instanceof Uint8Array 
+      ? input 
+      : this.stringToBytes(input);
+    
     let hash = await this.sha256(inputBytes);
 
     // Simulate RandomX VM execution with multiple rounds
