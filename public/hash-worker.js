@@ -18,7 +18,13 @@ async function initializeRandomX() {
     // In real mining, this comes from block template
     const randomBytes = new Uint8Array(32);
     crypto.getRandomValues(randomBytes);
-    const seed = `randomx-seed-${Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('')}-${workerId}`;
+    
+    // Convert to hex efficiently
+    let hexSeed = '';
+    for (let i = 0; i < randomBytes.length; i++) {
+      hexSeed += randomBytes[i].toString(16).padStart(2, '0');
+    }
+    const seed = `randomx-seed-${hexSeed}-${workerId}`;
     
     // Initialize with progress reporting
     self.postMessage({

@@ -112,14 +112,17 @@ class RandomXModule {
     
     for (let i = 0; i < 32; i++) {
       // Read from scratchpad using hash as index with bitwise AND
-      const readIndex = (((hash[i] << 8) | hash[(i + 1) % 32]) * 64) & scratchpadMask;
+      // Ensure proper alignment by masking before multiplication
+      const readOffset = ((hash[i] << 8) | hash[(i + 1) % 32]) & 0xFFFF;
+      const readIndex = (readOffset * 64) & scratchpadMask;
       const scratchValue = this.scratchpad[readIndex];
       
       // Mix
       mixed[i] = hash[i] ^ scratchValue ^ round;
       
       // Write back to scratchpad
-      const writeIndex = (((hash[(i + 2) % 32] << 8) | hash[(i + 3) % 32]) * 64) & scratchpadMask;
+      const writeOffset = ((hash[(i + 2) % 32] << 8) | hash[(i + 3) % 32]) & 0xFFFF;
+      const writeIndex = (writeOffset * 64) & scratchpadMask;
       this.scratchpad[writeIndex] = (this.scratchpad[writeIndex] + hash[i] + round) & 0xFF;
     }
     
