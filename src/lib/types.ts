@@ -8,8 +8,12 @@ export interface WorkerStats {
 }
 
 export interface WorkerCapabilities {
-  cryptoSubtle: boolean;
-  performance: boolean;
+  cryptoSubtle?: boolean;
+  performance?: boolean;
+  randomx?: boolean;
+  wasmSupport?: boolean;
+  mode?: string;
+  memoryMB?: number;
 }
 
 export interface BenchmarkConfig {
@@ -20,7 +24,7 @@ export interface BenchmarkConfig {
 }
 
 export interface WorkerMessage {
-  type: 'READY' | 'STATS' | 'ERROR' | 'STOPPED';
+  type: 'READY' | 'STATS' | 'ERROR' | 'STOPPED' | 'INIT_PROGRESS' | 'DESTROYED';
   workerId: number;
   hashesDelta?: number;
   elapsedMs?: number;
@@ -30,6 +34,16 @@ export interface WorkerMessage {
   capabilities?: WorkerCapabilities;
   error?: string;
   details?: string;
+  progress?: number;
+  message?: string;
+  memoryInfo?: {
+    scratchpadSize: number;
+    cacheSize: number;
+    totalBytes: number;
+    totalMB: number;
+    mode: string;
+  };
+  memoryUsageMB?: number;
 }
 
 export type WorkerState = 'idle' | 'initializing' | 'running' | 'error' | 'stopped';

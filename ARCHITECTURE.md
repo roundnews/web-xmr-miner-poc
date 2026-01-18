@@ -2,7 +2,7 @@
 
 ## Overview
 
-This application demonstrates browser-based parallel computing using a coordinator-worker pattern with cryptographic hash functions for benchmarking.
+This application demonstrates browser-based Monero (XMR) mining using the RandomX proof-of-work algorithm with a coordinator-worker pattern for parallel computing.
 
 ## System Architecture
 
@@ -32,8 +32,9 @@ This application demonstrates browser-based parallel computing using a coordinat
 │  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐││
 │  │  │ Worker 0 │  │ Worker 1 │  │ Worker 2 │  │ Worker N │││
 │  │  │          │  │          │  │          │  │          │││
-│  │  │ SHA-256  │  │ SHA-256  │  │ SHA-256  │  │ SHA-256  │││
-│  │  │ Hashing  │  │ Hashing  │  │ Hashing  │  │ Hashing  │││
+│  │  │ RandomX  │  │ RandomX  │  │ RandomX  │  │ RandomX  │││
+│  │  │ Module   │  │ Module   │  │ Module   │  │ Module   │││
+│  │  │ (258MB)  │  │ (258MB)  │  │ (258MB)  │  │ (258MB)  │││
 │  │  │          │  │          │  │          │  │          │││
 │  │  │ Throttle │  │ Throttle │  │ Throttle │  │ Throttle │││
 │  │  │ Loop     │  │ Loop     │  │ Loop     │  │ Loop     │││
@@ -83,10 +84,13 @@ getAggregatedStats(): AggregatedStats
 ### 2. Hash Worker (`/public/hash-worker.js`)
 
 **Responsibilities:**
-- SHA-256 hash computation
+- RandomX module initialization
+- Memory scratchpad management (256MB light mode)
+- RandomX hash computation
 - Duty-cycle throttling implementation
 - Statistics reporting
-- Graceful shutdown
+- Memory usage tracking
+- Graceful shutdown and cleanup
 
 **Message Protocol:**
 
@@ -96,14 +100,39 @@ getAggregatedStats(): AggregatedStats
 { type: 'START', data: { config: { throttle, statsInterval } } }
 { type: 'STOP' }
 { type: 'UPDATE_CONFIG', data: { throttle } }
+{ type: 'DESTROY' }
 ```
 
 **Outgoing:**
 ```javascript
-{ type: 'READY', workerId, capabilities }
-{ type: 'STATS', workerId, hashesDelta, elapsedMs, totalHashes, hashrate, dutyCycle }
+{ type: 'INIT_PROGRESS', workerId, progress, message, memoryInfo }
+{ type: 'READY', workerId, capabilities: { randomx, wasmSupport, mode, memoryMB } }
+{ type: 'STATS', workerId, hashesDelta, elapsedMs, totalHashes, hashrate, dutyCycle, memoryUsageMB }
 { type: 'ERROR', workerId, error, details }
 { type: 'STOPPED', workerId, totalHashes }
+{ type: 'DESTROYED', workerId }
+```
+
+**RandomX Initialization Flow:**
+```javascript
+async function initializeRandomX() {
+  // 1. Create RandomX module instance
+  randomxModule = new RandomXModule()
+  
+  // 2. Allocate 256MB scratchpad + 2MB cache
+  // Report: INIT_PROGRESS (0%, "Allocating memory...")
+  
+  // 3. Initialize cache with seed
+  await randomxModule.init(seed)
+  
+  // 4. Fill scratchpad from cache
+  // Report: INIT_PROGRESS (50%, "Filling scratchpad...")
+  
+  // 5. Complete initialization
+  // Report: INIT_PROGRESS (100%, "RandomX initialized")
+  
+  // 6. Send READY message with capabilities
+}
 ```
 
 **Hashing Loop:**
@@ -111,17 +140,59 @@ getAggregatedStats(): AggregatedStats
 while (running) {
   // Work phase
   for (workMs duration) {
-    hash(randomInput)
+    // Calculate RandomX hash (slow, memory-intensive)
+    await randomxHash(randomInput)
     totalHashes++
   }
   
-  // Stats reporting
+  // Stats reporting (includes memory usage)
   if (statsInterval elapsed) {
-    postMessage({ type: 'STATS', ... })
+    postMessage({ 
+      type: 'STATS',
+      memoryUsageMB: randomxModule.getMemoryInfo().totalMB,
+      ...
+    })
   }
   
   // Sleep phase (throttling)
   sleep(sleepMs)
+}
+```
+
+### 3. RandomX Module (`/public/wasm/randomx.js`)
+
+**Responsibilities:**
+- Memory scratchpad allocation (256MB)
+- Cache generation and initialization
+- Scratchpad filling and mixing
+- Hash calculation with VM simulation
+- Memory management and cleanup
+
+**Key Components:**
+
+1. **Memory Scratchpad** (256MB)
+   - Random-access memory buffer
+   - Mixed during each hash operation
+   - Provides memory-hardness
+
+2. **Cache** (2MB)
+   - Initialized from seed using SHA-256
+   - Used to derive scratchpad contents
+   - Simulates Argon2d behavior
+
+3. **Hash Calculation**
+   - 8 rounds of VM execution simulation
+   - Scratchpad mixing (memory-hard)
+   - Multiple SHA-256 operations (CPU-intensive)
+   - Returns 32-byte hash
+
+**API:**
+```javascript
+class RandomXModule {
+  async init(seedKey)                    // Initialize with seed
+  async calculateHash(input)             // Calculate hash
+  getMemoryInfo()                        // Get memory usage stats
+  destroy()                              // Release memory
 }
 ```
 

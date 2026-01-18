@@ -143,6 +143,11 @@ export class WorkerCoordinator {
     if (!workerInfo) return;
 
     switch (message.type) {
+      case 'INIT_PROGRESS':
+        // Handle initialization progress (could be used for UI feedback)
+        console.log(`Worker ${workerId}: ${message.message} (${message.progress}%)`);
+        break;
+
       case 'STATS':
         if (message.totalHashes !== undefined) {
           workerInfo.totalHashes = message.totalHashes;
