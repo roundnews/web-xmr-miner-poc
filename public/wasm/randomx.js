@@ -7,10 +7,16 @@
  * - CPU-intensive hashing operations
  * - Initialization overhead
  * - Realistic performance profiles
+ * - Both light mode (256MB) and fast mode (2GB+) support
  * 
  * For production use, this should be replaced with the official RandomX WASM implementation.
  * See: https://github.com/tevador/RandomX
  */
+
+// Constants for VM execution rounds
+const LIGHT_MODE_ROUNDS = 8;  // More rounds for light mode (slower but less memory)
+const FAST_MODE_ROUNDS = 4;   // Fewer rounds for fast mode (faster with dataset)
+const DATASET_PROGRESS_INTERVAL = 10;  // Report progress every 10% during dataset generation
 
 class RandomXModule {
   constructor(mode = 'light') {
@@ -109,14 +115,21 @@ class RandomXModule {
 
   /**
    * Generate dataset from cache (fast mode only)
-   * In real RandomX, this uses SuperscalarHash
+   * 
+   * In fast mode, RandomX uses a pre-computed dataset derived from the cache.
+   * This dataset is used during hash calculation to improve performance.
+   * The dataset is 2GB in size and takes 10-30 seconds to generate.
+   * 
+   * In real RandomX, this uses SuperscalarHash for dataset item generation.
+   * This simulation uses a simplified derivation from the cache.
+   * 
+   * @param {Function} progressCallback - Optional callback for progress updates (progress%, message)
    */
   async generateDataset(progressCallback) {
     if (!this.dataset) return;
 
     let yieldCounter = 0;
     const yieldThreshold = 32768; // Yield every ~2MB
-    const totalItems = Math.floor(this.dataset.length / 64);
     
     for (let i = 0; i < this.dataset.length; i += 64) {
       // Generate dataset item from cache
@@ -129,8 +142,8 @@ class RandomXModule {
         this.dataset[i + j] = cacheValue ^ ((i + j) & 0xFF);
       }
       
-      // Progress reporting
-      if (yieldCounter % (yieldThreshold * 10) === 0 && progressCallback) {
+      // Progress reporting every DATASET_PROGRESS_INTERVAL percent
+      if (yieldCounter % (yieldThreshold * DATASET_PROGRESS_INTERVAL) === 0 && progressCallback) {
         const progress = 50 + Math.floor((i / this.dataset.length) * 20);
         progressCallback(progress, `Generating dataset... ${Math.floor((i / this.dataset.length) * 100)}%`);
       }
@@ -147,7 +160,7 @@ class RandomXModule {
   /**
    * Calculate RandomX hash
    * Simulates the VM execution with scratchpad mixing
-   * Fast mode uses dataset for better performance
+   * Fast mode uses dataset for better performance and fewer rounds
    */
   async calculateHash(input) {
     if (!this.initialized) {
@@ -158,9 +171,8 @@ class RandomXModule {
     let hash = await this.sha256(inputBytes);
 
     // Simulate RandomX VM execution with multiple rounds
-    // Real RandomX does 8 program iterations
-    // Fast mode has better performance due to dataset
-    const rounds = this.mode === 'fast' ? 4 : 8;
+    // Fast mode has fewer rounds but better performance due to dataset
+    const rounds = this.mode === 'fast' ? FAST_MODE_ROUNDS : LIGHT_MODE_ROUNDS;
     for (let round = 0; round < rounds; round++) {
       // Mix with scratchpad (memory-hard operation)
       hash = await this.scratchpadMix(hash, round);
