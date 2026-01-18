@@ -1,4 +1,4 @@
-# Browser Performance Demonstrator
+# Web XMR miner POC
 
 An educational web application that demonstrates browser-based parallel computing using Web Workers and cryptographic hash functions (SHA-256).
 

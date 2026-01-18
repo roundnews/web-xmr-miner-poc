@@ -1,6 +1,6 @@
 # Planning Guide
 
-Educational browser-based WebAssembly performance demonstrator showing parallel computing capabilities, resource management, and real-time telemetry through cryptographic hash benchmarking.
+Web XMR miner POC: Educational browser-based WebAssembly performance demonstrator showing parallel computing capabilities, resource management, and real-time telemetry through cryptographic hash benchmarking.
 
 **Experience Qualities**:
 1. **Transparent** - Every action, resource usage, and performance metric is visible and explained to build trust

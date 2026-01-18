@@ -153,7 +153,7 @@ function App() {
       <div className="max-w-7xl mx-auto space-y-6">
         <header className="text-center space-y-2 py-6">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
-            Browser Performance Demonstrator
+            Web XMR miner POC
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Educational WebAssembly + Web Workers benchmark measuring parallel computing capabilities
