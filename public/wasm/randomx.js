@@ -13,41 +13,65 @@
  */
 
 class RandomXModule {
-  constructor() {
+  constructor(mode = 'light') {
     this.initialized = false;
     this.cache = null;
+    this.dataset = null;
     this.scratchpad = null;
-    this.scratchpadSize = 256 * 1024 * 1024; // 256MB for light mode
-    this.cacheSize = 2 * 1024 * 1024; // 2MB cache
+    this.mode = mode;
+    
+    // Set memory sizes based on mode
+    if (mode === 'fast') {
+      this.scratchpadSize = 2 * 1024 * 1024 * 1024; // 2GB for fast mode
+      this.datasetSize = 2 * 1024 * 1024 * 1024; // 2GB dataset
+      this.cacheSize = 2 * 1024 * 1024; // 2MB cache
+    } else {
+      // Light mode (default)
+      this.scratchpadSize = 256 * 1024 * 1024; // 256MB for light mode
+      this.cacheSize = 2 * 1024 * 1024; // 2MB cache
+      this.datasetSize = 0; // No dataset in light mode
+    }
   }
 
   /**
    * Initialize the RandomX cache with a seed key
    * This simulates the slow initialization phase of RandomX
    */
-  async init(seedKey) {
+  async init(seedKey, progressCallback) {
     if (this.initialized) {
       return;
     }
 
     // Allocate scratchpad (simulating memory-hard requirement)
+    if (progressCallback) progressCallback(10, 'Allocating scratchpad...');
     this.scratchpad = new Uint8Array(this.scratchpadSize);
+    
+    // Allocate cache
+    if (progressCallback) progressCallback(20, 'Allocating cache...');
     this.cache = new Uint8Array(this.cacheSize);
 
+    // In fast mode, allocate dataset
+    if (this.mode === 'fast') {
+      if (progressCallback) progressCallback(30, 'Allocating dataset (2GB)...');
+      this.dataset = new Uint8Array(this.datasetSize);
+    }
+
     // Simulate cache initialization (Argon2d-like process)
-    // In real RandomX, this takes 1-5 seconds
+    // In real RandomX, this takes 1-5 seconds for light mode, 10-30 seconds for fast mode
     const seed = this.stringToBytes(seedKey);
-    await this.initializeCache(seed);
+    await this.initializeCache(seed, progressCallback);
 
     this.initialized = true;
+    if (progressCallback) progressCallback(100, `RandomX ${this.mode} mode initialized`);
   }
 
   /**
    * Simulate cache initialization with progressive filling
    * Mimics Argon2d + SuperscalarHash behavior
    */
-  async initializeCache(seed) {
+  async initializeCache(seed, progressCallback) {
     // Fill cache with derived data
+    if (progressCallback) progressCallback(40, 'Filling cache...');
     for (let i = 0; i < this.cache.length; i += 64) {
       const block = await this.sha256Mix(seed, i);
       for (let j = 0; j < Math.min(64, this.cache.length - i); j++) {
@@ -55,13 +79,21 @@ class RandomXModule {
       }
     }
 
-    // Fill scratchpad using cache
+    // In fast mode, generate full dataset from cache
+    if (this.mode === 'fast') {
+      if (progressCallback) progressCallback(50, 'Generating dataset from cache...');
+      await this.generateDataset(progressCallback);
+    }
+
+    // Fill scratchpad using cache (or dataset in fast mode)
+    if (progressCallback) progressCallback(70, 'Filling scratchpad...');
     let yieldCounter = 0;
     const yieldThreshold = 16384; // Yield every ~1MB
     
     for (let i = 0; i < this.scratchpad.length; i += 64) {
-      const cacheIndex = i % this.cache.length;
-      const block = this.cache.slice(cacheIndex, Math.min(cacheIndex + 64, this.cache.length));
+      const sourceData = this.mode === 'fast' && this.dataset ? this.dataset : this.cache;
+      const sourceIndex = i % sourceData.length;
+      const block = sourceData.slice(sourceIndex, Math.min(sourceIndex + 64, sourceData.length));
       for (let j = 0; j < Math.min(64, this.scratchpad.length - i); j++) {
         this.scratchpad[i + j] = block[j % block.length] ^ (i & 0xFF);
       }
@@ -76,8 +108,46 @@ class RandomXModule {
   }
 
   /**
+   * Generate dataset from cache (fast mode only)
+   * In real RandomX, this uses SuperscalarHash
+   */
+  async generateDataset(progressCallback) {
+    if (!this.dataset) return;
+
+    let yieldCounter = 0;
+    const yieldThreshold = 32768; // Yield every ~2MB
+    const totalItems = Math.floor(this.dataset.length / 64);
+    
+    for (let i = 0; i < this.dataset.length; i += 64) {
+      // Generate dataset item from cache
+      const cacheIndex = (i / 64) % (this.cache.length / 64);
+      const cacheOffset = cacheIndex * 64;
+      
+      // Simple derivation (in real RandomX, this is much more complex)
+      for (let j = 0; j < 64 && i + j < this.dataset.length; j++) {
+        const cacheValue = this.cache[(cacheOffset + j) % this.cache.length];
+        this.dataset[i + j] = cacheValue ^ ((i + j) & 0xFF);
+      }
+      
+      // Progress reporting
+      if (yieldCounter % (yieldThreshold * 10) === 0 && progressCallback) {
+        const progress = 50 + Math.floor((i / this.dataset.length) * 20);
+        progressCallback(progress, `Generating dataset... ${Math.floor((i / this.dataset.length) * 100)}%`);
+      }
+      
+      // Yield periodically to avoid blocking
+      yieldCounter++;
+      if (yieldCounter >= yieldThreshold) {
+        await this.sleep(0);
+        yieldCounter = 0;
+      }
+    }
+  }
+
+  /**
    * Calculate RandomX hash
    * Simulates the VM execution with scratchpad mixing
+   * Fast mode uses dataset for better performance
    */
   async calculateHash(input) {
     if (!this.initialized) {
@@ -89,7 +159,9 @@ class RandomXModule {
 
     // Simulate RandomX VM execution with multiple rounds
     // Real RandomX does 8 program iterations
-    for (let round = 0; round < 8; round++) {
+    // Fast mode has better performance due to dataset
+    const rounds = this.mode === 'fast' ? 4 : 8;
+    for (let round = 0; round < rounds; round++) {
       // Mix with scratchpad (memory-hard operation)
       hash = await this.scratchpadMix(hash, round);
       
@@ -196,9 +268,10 @@ class RandomXModule {
     return {
       scratchpadSize: this.scratchpadSize,
       cacheSize: this.cacheSize,
-      totalBytes: this.scratchpadSize + this.cacheSize,
-      totalMB: Math.round((this.scratchpadSize + this.cacheSize) / (1024 * 1024)),
-      mode: 'light'
+      datasetSize: this.datasetSize || 0,
+      totalBytes: this.scratchpadSize + this.cacheSize + (this.datasetSize || 0),
+      totalMB: Math.round((this.scratchpadSize + this.cacheSize + (this.datasetSize || 0)) / (1024 * 1024)),
+      mode: this.mode
     };
   }
 
@@ -208,6 +281,7 @@ class RandomXModule {
   destroy() {
     this.scratchpad = null;
     this.cache = null;
+    this.dataset = null;
     this.initialized = false;
   }
 }

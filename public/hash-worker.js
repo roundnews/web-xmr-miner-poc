@@ -10,9 +10,9 @@ let initializationProgress = 0;
 /**
  * Initialize RandomX module
  */
-async function initializeRandomX() {
+async function initializeRandomX(mode = 'light') {
   try {
-    randomxModule = new RandomXModule();
+    randomxModule = new RandomXModule(mode);
     
     // Generate a cryptographically secure seed
     // In real mining, this comes from block template
@@ -27,14 +27,17 @@ async function initializeRandomX() {
     const seed = `randomx-seed-${hexSeed}-${workerId}`;
     
     // Initialize with progress reporting
-    self.postMessage({
-      type: 'INIT_PROGRESS',
-      workerId,
-      progress: 0,
-      message: 'Allocating memory...'
-    });
+    const progressCallback = (progress, message) => {
+      self.postMessage({
+        type: 'INIT_PROGRESS',
+        workerId,
+        progress,
+        message
+      });
+    };
     
-    await randomxModule.init(seed);
+    progressCallback(0, 'Starting initialization...');
+    await randomxModule.init(seed, progressCallback);
     
     const memInfo = randomxModule.getMemoryInfo();
     
@@ -42,7 +45,7 @@ async function initializeRandomX() {
       type: 'INIT_PROGRESS',
       workerId,
       progress: 100,
-      message: 'RandomX initialized',
+      message: `RandomX ${mode} mode initialized`,
       memoryInfo: memInfo
     });
     
@@ -117,7 +120,9 @@ self.onmessage = async function(e) {
     case 'INIT':
       workerId = data.workerId;
       try {
-        const memInfo = await initializeRandomX();
+        // Support mode selection (default to 'light')
+        const mode = data.mode || 'light';
+        const memInfo = await initializeRandomX(mode);
         self.postMessage({
           type: 'READY',
           workerId,

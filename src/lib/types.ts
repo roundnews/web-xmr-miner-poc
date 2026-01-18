@@ -21,6 +21,7 @@ export interface BenchmarkConfig {
   throttle: number;
   duration: number;
   statsInterval: number;
+  mode?: 'light' | 'fast'; // RandomX mode
 }
 
 export interface WorkerMessage {

@@ -46,7 +46,13 @@ export class WorkerCoordinator {
           this.updateStats();
         };
 
-        worker.postMessage({ type: 'INIT', data: { workerId: workerInfo.id } });
+        worker.postMessage({ 
+          type: 'INIT', 
+          data: { 
+            workerId: workerInfo.id,
+            mode: this.config.mode || 'light'
+          } 
+        });
 
         await new Promise<void>((resolve) => {
           const checkReady = (e: MessageEvent<WorkerMessage>) => {

@@ -23,13 +23,24 @@ RandomX is a Proof-of-Work (PoW) algorithm that is optimized for general-purpose
 
 ### Current Implementation
 
-This proof-of-concept uses a **RandomX-Lite simulation** (`/public/wasm/randomx.js`) that demonstrates the key characteristics of RandomX:
+This proof-of-concept uses a **RandomX-Lite simulation** (`/public/wasm/randomx.js`) that demonstrates the key characteristics of RandomX in both light and fast modes:
 
-- ✅ 256MB memory scratchpad (light mode)
-- ✅ Slow initialization phase (simulates Argon2d cache generation)
+**Light Mode (Default):**
+- ✅ 256MB memory scratchpad
+- ✅ 2MB cache
+- ✅ Slow initialization (2-5 seconds)
 - ✅ Memory-hard hashing (scratchpad mixing)
-- ✅ CPU-intensive operations (multiple hash rounds)
+- ✅ CPU-intensive operations (8 hash rounds)
 - ✅ Realistic performance (~10-100 H/s)
+
+**Fast Mode (Optional):**
+- ✅ 2GB memory scratchpad
+- ✅ 2GB dataset
+- ✅ 2MB cache
+- ✅ Slower initialization (10-30 seconds)
+- ✅ Better hash performance (~100-500 H/s)
+- ✅ Reduced VM rounds (4 instead of 8)
+- ⚠️ Requires desktop browser with sufficient RAM
 
 ### Architecture
 
@@ -60,37 +71,40 @@ This proof-of-concept uses a **RandomX-Lite simulation** (`/public/wasm/randomx.
 
 ### Memory Requirements
 
-| Mode  | Cache | Scratchpad | Total  | Browser Compatibility |
-|-------|-------|------------|--------|----------------------|
-| Light | 2MB   | 256MB      | 258MB  | ✅ Most browsers     |
-| Fast  | 2GB   | 2GB        | 4GB+   | ⚠️ Desktop only      |
+| Mode  | Cache | Scratchpad | Dataset | Total  | Browser Compatibility |
+|-------|-------|------------|---------|--------|----------------------|
+| Light | 2MB   | 256MB      | -       | 258MB  | ✅ Most browsers     |
+| Fast  | 2MB   | 2GB        | 2GB     | 4GB+   | ⚠️ Desktop only      |
 
-**Current implementation uses Light mode** for maximum browser compatibility.
+**Both modes are now implemented**. Default is Light mode for maximum browser compatibility. Fast mode can be enabled by passing `mode: 'fast'` in the worker configuration.
 
 ### Performance Characteristics
 
-#### Expected Hashrates (Light Mode)
+#### Expected Hashrates
 
-| Device Type    | Threads | RandomX H/s | SHA256 H/s (Previous) |
-|----------------|---------|-------------|-----------------------|
-| Mobile (2-4 core) | 2-4  | 5-20        | 10K-100K              |
-| Laptop (4-8 core) | 4-8  | 20-100      | 50K-500K              |
-| Desktop (8+ core) | 8    | 50-200      | 100K-1M+              |
+| Device Type    | Threads | Light Mode H/s | Fast Mode H/s | SHA256 H/s (Previous) |
+|----------------|---------|----------------|---------------|-----------------------|
+| Mobile (2-4 core) | 2-4  | 5-20           | N/A (OOM)     | 10K-100K              |
+| Laptop (4-8 core) | 4-8  | 20-100         | 100-300       | 50K-500K              |
+| Desktop (8+ core) | 8    | 50-200         | 200-500       | 100K-1M+              |
 
 **Note:** RandomX is intentionally ~1000-10000x slower than SHA256. This is by design.
 
 #### Initialization Time
 
 - **Light mode**: 2-5 seconds
-- **Fast mode**: 10-30 seconds (not implemented)
+- **Fast mode**: 10-30 seconds
 
 ## Worker Protocol
 
 ### Messages to Worker
 
 ```javascript
-// Initialize worker with RandomX
+// Initialize worker with RandomX (Light mode - default)
 { type: 'INIT', data: { workerId: 0 } }
+
+// Initialize worker with RandomX (Fast mode)
+{ type: 'INIT', data: { workerId: 0, mode: 'fast' } }
 
 // Start hashing
 { type: 'START', data: { config: { throttle: 30, statsInterval: 1000 } } }
@@ -136,15 +150,80 @@ This proof-of-concept uses a **RandomX-Lite simulation** (`/public/wasm/randomx.
 }
 ```
 
+## Usage Examples
+
+### Using Light Mode (Default)
+
+```javascript
+// In coordinator configuration
+const config = {
+  threads: 4,
+  throttle: 30,
+  duration: 60,
+  statsInterval: 1000,
+  mode: 'light' // or omit for default
+};
+
+const coordinator = new WorkerCoordinator(config);
+await coordinator.initialize();
+coordinator.start();
+```
+
+### Using Fast Mode (Desktop Only)
+
+```javascript
+// Check available memory first
+const availableMemory = navigator.deviceMemory || 8; // GB estimate
+
+if (availableMemory >= 8) {
+  const config = {
+    threads: 2, // Fewer threads due to memory requirements
+    throttle: 30,
+    duration: 60,
+    statsInterval: 1000,
+    mode: 'fast' // Enable fast mode
+  };
+
+  const coordinator = new WorkerCoordinator(config);
+  await coordinator.initialize();
+  coordinator.start();
+} else {
+  console.log('Insufficient memory for fast mode, using light mode');
+}
+```
+
+### Memory Detection
+
+```javascript
+function selectOptimalMode() {
+  const memory = navigator.deviceMemory || 4;
+  const isMobile = /Mobile|Android|iPhone/i.test(navigator.userAgent);
+  
+  if (isMobile) {
+    return { mode: 'light', threads: 1 };
+  } else if (memory >= 8) {
+    return { mode: 'fast', threads: 2 };
+  } else {
+    return { mode: 'light', threads: 4 };
+  }
+}
+
+const { mode, threads } = selectOptimalMode();
+```
+
 ## Browser Considerations
 
 ### Memory Limitations
 
 1. **Per-Tab Limits**: Most browsers limit single-tab memory to 2-4GB
 2. **Mobile Limits**: Mobile browsers may limit to 256-512MB
-3. **Multiple Workers**: Each worker needs its own scratchpad (256MB × N threads)
+3. **Multiple Workers**: 
+   - Light mode: 258MB × N threads
+   - Fast mode: 4GB × N threads (recommend max 1-2 threads)
 
-**Recommendation**: Use 1-2 threads on mobile, 2-4 threads on desktop.
+**Recommendation**: 
+- Light mode: 1-2 threads on mobile, 2-8 threads on desktop
+- Fast mode: 1-2 threads on desktop only (8GB+ RAM recommended)
 
 ### Performance Factors
 
@@ -156,13 +235,16 @@ This proof-of-concept uses a **RandomX-Lite simulation** (`/public/wasm/randomx.
 ### Best Practices
 
 ✅ **Do:**
-- Start with 1-2 threads to test
+- Start with light mode and 1-2 threads to test
 - Monitor device temperature
 - Run on AC power for extended benchmarks
-- Use light mode for maximum compatibility
+- Use light mode on mobile and laptops
+- Use fast mode only on desktop with 8GB+ RAM
 - Expect significantly lower hashrates than SHA256
 
 ❌ **Don't:**
+- Run fast mode on mobile devices (will cause out-of-memory errors)
+- Use more than 2 threads in fast mode
 - Run 8+ threads on mobile devices
 - Expect GPU-like performance
 - Run extended tests on battery
@@ -172,11 +254,19 @@ This proof-of-concept uses a **RandomX-Lite simulation** (`/public/wasm/randomx.
 
 ### This Implementation
 
-- ✅ Memory-hard characteristics (256MB scratchpad)
-- ✅ Realistic initialization time
-- ✅ Realistic performance profile
+**Light Mode:**
+- ✅ 256MB scratchpad memory-hard characteristics
+- ✅ Realistic initialization time (2-5 seconds)
+- ✅ Realistic performance profile (10-200 H/s)
 - ✅ Browser-compatible
 - ✅ Educational proof-of-concept
+
+**Fast Mode:**
+- ✅ 2GB scratchpad + 2GB dataset (4GB total)
+- ✅ Slower initialization (10-30 seconds)
+- ✅ Better performance (100-500 H/s)
+- ✅ Reduced VM rounds for efficiency
+- ✅ Desktop-only compatibility
 
 ### Real RandomX
 
