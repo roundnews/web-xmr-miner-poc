@@ -1,5 +1,5 @@
-// Import RandomX module and block header utilities
-importScripts('/wasm/randomx.js');
+// Import RandomX WebGPU module and block header utilities
+importScripts('/wasm/randomx-webgpu.js');
 importScripts('/block-header.js');
 
 let running = false;
@@ -14,7 +14,6 @@ let nonce = 0;
 let nonceStart = 0;
 let nonceEnd = 0;
 // Difficulty target: Finding solutions roughly every 10-100M hashes
-// Adjusted to be achievable within reasonable benchmark duration
 const DIFFICULTY_TARGET = BigInt('0x00000000FFFF0000000000000000000000000000000000000000000000000000');
 let solutionsFound = 0;
 let cacheReinitCount = 0;
@@ -22,14 +21,13 @@ let lastCacheReinit = 0;
 let totalWorkers = 1;
 
 /**
- * Initialize RandomX module
+ * Initialize RandomX WebGPU module
  */
 async function initializeRandomX(mode = 'light') {
   try {
-    randomxModule = new RandomXModule(mode);
+    randomxModule = new RandomXWebGPUModule(mode);
     
     // Generate a cryptographically secure seed
-    // In real mining, this comes from block template
     const randomBytes = new Uint8Array(32);
     crypto.getRandomValues(randomBytes);
     
@@ -38,7 +36,7 @@ async function initializeRandomX(mode = 'light') {
     for (let i = 0; i < randomBytes.length; i++) {
       hexSeed += randomBytes[i].toString(16).padStart(2, '0');
     }
-    const seed = `randomx-seed-${hexSeed}-${workerId}`;
+    const seed = `randomx-webgpu-seed-${hexSeed}-${workerId}`;
     
     // Initialize with progress reporting
     const progressCallback = (progress, message) => {
@@ -46,11 +44,11 @@ async function initializeRandomX(mode = 'light') {
         type: 'INIT_PROGRESS',
         workerId,
         progress,
-        message
+        message: `[WebGPU] ${message}`
       });
     };
     
-    progressCallback(0, 'Starting initialization...');
+    progressCallback(0, 'Starting WebGPU initialization...');
     await randomxModule.init(seed, progressCallback);
     
     const memInfo = randomxModule.getMemoryInfo();
@@ -59,22 +57,22 @@ async function initializeRandomX(mode = 'light') {
       type: 'INIT_PROGRESS',
       workerId,
       progress: 100,
-      message: `RandomX ${mode} mode initialized`,
+      message: `RandomX WebGPU ${mode} mode initialized`,
       memoryInfo: memInfo
     });
     
     return memInfo;
   } catch (error) {
-    throw new Error(`Failed to initialize RandomX: ${error.message}`);
+    throw new Error(`Failed to initialize RandomX WebGPU: ${error.message}`);
   }
 }
 
 /**
- * Calculate RandomX hash
+ * Calculate RandomX hash using WebGPU
  */
 async function randomxHash(input) {
   if (!randomxModule || !randomxModule.initialized) {
-    throw new Error('RandomX not initialized');
+    throw new Error('RandomX WebGPU not initialized');
   }
   return await randomxModule.calculateHash(input);
 }
@@ -91,14 +89,14 @@ async function hashingLoop(config) {
   const workMs = Math.max(1, 100 - throttle);
   const sleepMs = Math.max(1, throttle);
   
-  const CACHE_REINIT_INTERVAL = 120000; // 120 seconds (2 minutes like Monero)
+  const CACHE_REINIT_INTERVAL = 120000; // 120 seconds (2 minutes)
   lastCacheReinit = performance.now();
   
   while (running) {
     const batchStart = performance.now();
     let batchHashes = 0;
     
-    // Check for cache reinitialization (simulates blockchain height change)
+    // Check for cache reinitialization
     const now = performance.now();
     if (now - lastCacheReinit >= CACHE_REINIT_INTERVAL) {
       // Simulate blockchain height change - reinitialize cache
@@ -110,7 +108,7 @@ async function hashingLoop(config) {
       // Update block template with new timestamp
       blockTemplate.updateTimestamp(Math.floor(Date.now() / 1000));
       
-      console.log(`Worker ${workerId}: Cache reinitialized (count: ${cacheReinitCount})`);
+      console.log(`Worker ${workerId} [WebGPU]: Cache reinitialized (count: ${cacheReinitCount})`);
     }
     
     while (performance.now() - batchStart < workMs && running) {
@@ -120,20 +118,18 @@ async function hashingLoop(config) {
       // Serialize to binary (76 bytes)
       const headerBytes = blockTemplate.serialize();
       
-      // Hash the binary header
+      // Hash the binary header using WebGPU
       const hash = await randomxHash(headerBytes);
       
-      // Compare against difficulty (adds realistic overhead)
+      // Compare against difficulty
       try {
         const hashValue = BigInt('0x' + hash);
         if (hashValue < DIFFICULTY_TARGET) {
-          // Found solution (log but don't stop - educational)
-          console.log(`Worker ${workerId} found solution at nonce ${nonce}, hash: ${hash}`);
+          console.log(`Worker ${workerId} [WebGPU] found solution at nonce ${nonce}, hash: ${hash}`);
           solutionsFound++;
         }
       } catch (error) {
-        // Handle malformed hash (should not happen with valid randomxHash output)
-        console.error(`Worker ${workerId}: Invalid hash format: ${hash}`);
+        console.error(`Worker ${workerId} [WebGPU]: Invalid hash format: ${hash}`);
       }
       
       // Increment nonce sequentially
@@ -164,7 +160,7 @@ async function hashingLoop(config) {
         memoryUsageMB: memInfo ? memInfo.totalMB : 0,
         solutionsFound,
         cacheReinitCount,
-        backend: 'wasm'
+        backend: 'webgpu'
       });
       lastStatsTime = currentTime;
       hashesSinceLastStats = 0;
@@ -203,24 +199,25 @@ self.onmessage = async function(e) {
           0  // initial nonce
         );
         
-        console.log(`Worker ${workerId}: Nonce range ${nonceStart} to ${nonceEnd}`);
+        console.log(`Worker ${workerId} [WebGPU]: Nonce range ${nonceStart} to ${nonceEnd}`);
         
         self.postMessage({
           type: 'READY',
           workerId,
           capabilities: {
             randomx: true,
-            wasmSupport: typeof WebAssembly !== 'undefined',
+            wasmSupport: false,
+            webgpuSupport: true,
             mode: memInfo.mode,
             memoryMB: memInfo.totalMB,
-            backend: 'wasm'
+            backend: 'webgpu'
           }
         });
       } catch (error) {
         self.postMessage({
           type: 'ERROR',
           workerId,
-          error: 'Failed to initialize RandomX: ' + error.message,
+          error: 'Failed to initialize RandomX WebGPU: ' + error.message,
           details: error.stack
         });
       }

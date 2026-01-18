@@ -79,6 +79,26 @@ export function ControlPanel({
         </div>
 
         <div className="space-y-3">
+          <Label htmlFor="backend-select">Compute Backend</Label>
+          <Select
+            value={config.backend || 'wasm'}
+            onValueChange={(value) => onConfigChange({ backend: value as 'wasm' | 'webgpu' })}
+            disabled={disabled || isRunning}
+          >
+            <SelectTrigger id="backend-select">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="wasm">WASM (CPU)</SelectItem>
+              <SelectItem value="webgpu">WebGPU (GPU) - Educational</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            WebGPU demonstrates why RandomX favors CPUs - expect lower performance.
+          </p>
+        </div>
+
+        <div className="space-y-3">
           <Label htmlFor="duration-select">Duration</Label>
           <Select
             value={config.duration.toString()}

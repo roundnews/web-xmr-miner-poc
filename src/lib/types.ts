@@ -14,8 +14,10 @@ export interface WorkerCapabilities {
   performance?: boolean;
   randomx?: boolean;
   wasmSupport?: boolean;
+  webgpuSupport?: boolean;
   mode?: string;
   memoryMB?: number;
+  backend?: string;
 }
 
 export interface BenchmarkConfig {
@@ -24,6 +26,7 @@ export interface BenchmarkConfig {
   duration: number;
   statsInterval: number;
   mode?: 'light' | 'fast'; // RandomX mode
+  backend?: 'wasm' | 'webgpu'; // Compute backend
 }
 
 export interface WorkerMessage {
@@ -35,6 +38,7 @@ export interface WorkerMessage {
   hashrate?: number;
   dutyCycle?: number;
   capabilities?: WorkerCapabilities;
+  backend?: string;
   error?: string;
   details?: string;
   progress?: number;
@@ -45,6 +49,7 @@ export interface WorkerMessage {
     totalBytes: number;
     totalMB: number;
     mode: string;
+    backend?: string;
   };
   memoryUsageMB?: number;
   solutionsFound?: number;
@@ -62,6 +67,7 @@ export interface WorkerInfo {
   error?: string;
   solutionsFound?: number;
   cacheReinitCount?: number;
+  backend?: string;
 }
 
 export interface AggregatedStats {
