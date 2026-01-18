@@ -12,7 +12,7 @@
         "preview": "vite preview",
         "test": "vitest",
         "test:ui": "vitest --ui",
-        "test:webgpu": "vitest run --grep 'webgpu|backend'"
+        "test:webgpu": "vitest run --testNamePattern='webgpu|backend'"
     },
     "dependencies": {
         "@github/spark": ">=0.43.1 <1",
