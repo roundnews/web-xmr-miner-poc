@@ -56,6 +56,9 @@ class RandomXModule {
     }
 
     // Fill scratchpad using cache
+    let yieldCounter = 0;
+    const yieldThreshold = 16384; // Yield every ~1MB
+    
     for (let i = 0; i < this.scratchpad.length; i += 64) {
       const cacheIndex = i % this.cache.length;
       const block = this.cache.slice(cacheIndex, Math.min(cacheIndex + 64, this.cache.length));
@@ -63,9 +66,11 @@ class RandomXModule {
         this.scratchpad[i + j] = block[j % block.length] ^ (i & 0xFF);
       }
       
-      // Yield periodically to avoid blocking
-      if (i % (1024 * 1024) === 0) {
+      // Yield periodically to avoid blocking (using counter instead of modulo)
+      yieldCounter++;
+      if (yieldCounter >= yieldThreshold) {
         await this.sleep(0);
+        yieldCounter = 0;
       }
     }
   }
@@ -102,17 +107,19 @@ class RandomXModule {
    */
   async scratchpadMix(hash, round) {
     const mixed = new Uint8Array(32);
+    // Pre-calculate mask for efficient modulo (scratchpadSize is power of 2)
+    const scratchpadMask = this.scratchpad.length - 1;
     
     for (let i = 0; i < 32; i++) {
-      // Read from scratchpad using hash as index
-      const readIndex = ((hash[i] << 8) | hash[(i + 1) % 32]) * 64 % this.scratchpad.length;
+      // Read from scratchpad using hash as index with bitwise AND
+      const readIndex = (((hash[i] << 8) | hash[(i + 1) % 32]) * 64) & scratchpadMask;
       const scratchValue = this.scratchpad[readIndex];
       
       // Mix
       mixed[i] = hash[i] ^ scratchValue ^ round;
       
       // Write back to scratchpad
-      const writeIndex = ((hash[(i + 2) % 32] << 8) | hash[(i + 3) % 32]) * 64 % this.scratchpad.length;
+      const writeIndex = (((hash[(i + 2) % 32] << 8) | hash[(i + 3) % 32]) * 64) & scratchpadMask;
       this.scratchpad[writeIndex] = (this.scratchpad[writeIndex] + hash[i] + round) & 0xFF;
     }
     

@@ -14,8 +14,11 @@ async function initializeRandomX() {
   try {
     randomxModule = new RandomXModule();
     
-    // Generate a seed based on timestamp (in real mining, this comes from block template)
-    const seed = `randomx-seed-${Date.now()}-${workerId}`;
+    // Generate a cryptographically secure seed
+    // In real mining, this comes from block template
+    const randomBytes = new Uint8Array(32);
+    crypto.getRandomValues(randomBytes);
+    const seed = `randomx-seed-${Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('')}-${workerId}`;
     
     // Initialize with progress reporting
     self.postMessage({
