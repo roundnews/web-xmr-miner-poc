@@ -15,7 +15,8 @@ function App() {
     threads: 1,
     throttle: 30,
     duration: 60,
-    statsInterval: 1000
+    statsInterval: 1000,
+    backend: 'wasm' // Default to WASM for compatibility
   });
   const [stats, setStats] = useState<AggregatedStats>({
     totalHashes: 0,
@@ -31,6 +32,27 @@ function App() {
 
   const coordinatorRef = useRef<WorkerCoordinator | null>(null);
   const maxThreads = navigator.hardwareConcurrency || 4;
+
+  // Check WebGPU support and show info
+  useEffect(() => {
+    const checkWebGPU = async () => {
+      if (!navigator.gpu) {
+        console.log('WebGPU not supported - WASM backend only');
+      } else {
+        try {
+          const adapter = await navigator.gpu.requestAdapter();
+          if (adapter) {
+            console.log('WebGPU is available');
+          } else {
+            console.log('WebGPU adapter not available');
+          }
+        } catch (error) {
+          console.log('WebGPU check failed:', error);
+        }
+      }
+    };
+    checkWebGPU();
+  }, []);
 
   useEffect(() => {
     const handleVisibilityChange = () => {

@@ -142,6 +142,15 @@ export function TelemetryDashboard({ stats, workers, isRunning }: TelemetryDashb
             ))}
           </div>
         </div>
+
+        {workers.length > 0 && (
+          <div className="flex items-center gap-2 pt-2 text-xs text-muted-foreground">
+            <span className="font-medium">Backend:</span>
+            <Badge variant="outline" className="font-mono">
+              {workers[0].backend === 'webgpu' ? 'WebGPU (GPU)' : 'WASM (CPU)'}
+            </Badge>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -35,7 +35,10 @@ export class WorkerCoordinator {
 
     const initPromises = this.workers.map(async (workerInfo) => {
       try {
-        const worker = new Worker('/hash-worker.js');
+        const workerPath = this.config.backend === 'webgpu' 
+          ? '/hash-worker-webgpu.js' 
+          : '/hash-worker.js';
+        const worker = new Worker(workerPath);
         workerInfo.worker = worker;
 
         worker.onmessage = (e: MessageEvent<WorkerMessage>) => {
@@ -169,6 +172,9 @@ export class WorkerCoordinator {
         }
         if (message.cacheReinitCount !== undefined) {
           workerInfo.cacheReinitCount = message.cacheReinitCount;
+        }
+        if (message.backend !== undefined) {
+          workerInfo.backend = message.backend;
         }
         break;
 
