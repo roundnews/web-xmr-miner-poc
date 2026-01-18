@@ -32,3 +32,6 @@ pids
 .devcontainer/
 
 .spark-workbench-id
+
+# Test files
+public/test-randomx.html

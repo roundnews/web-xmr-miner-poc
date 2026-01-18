@@ -46,7 +46,13 @@ export class WorkerCoordinator {
           this.updateStats();
         };
 
-        worker.postMessage({ type: 'INIT', data: { workerId: workerInfo.id } });
+        worker.postMessage({ 
+          type: 'INIT', 
+          data: { 
+            workerId: workerInfo.id,
+            mode: this.config.mode || 'light'
+          } 
+        });
 
         await new Promise<void>((resolve) => {
           const checkReady = (e: MessageEvent<WorkerMessage>) => {
@@ -143,6 +149,11 @@ export class WorkerCoordinator {
     if (!workerInfo) return;
 
     switch (message.type) {
+      case 'INIT_PROGRESS':
+        // Handle initialization progress (could be used for UI feedback)
+        console.log(`Worker ${workerId}: ${message.message} (${message.progress}%)`);
+        break;
+
       case 'STATS':
         if (message.totalHashes !== undefined) {
           workerInfo.totalHashes = message.totalHashes;

@@ -1,11 +1,12 @@
-# Web XMR miner POC
+# Web XMR Miner POC
 
-An educational web application that demonstrates browser-based parallel computing using Web Workers and cryptographic hash functions (SHA-256).
+An educational web application that demonstrates browser-based Monero (XMR) mining using the RandomX proof-of-work algorithm with Web Workers for parallel computing.
 
 ## What This Is
 
 This is an **educational proof-of-concept** that shows:
 - How browsers can perform parallel computing using Web Workers
+- RandomX algorithm characteristics (memory-hard, CPU-optimized)
 - Real-time performance telemetry and monitoring
 - CPU resource management through throttling
 - Browser computing constraints and limitations
@@ -13,8 +14,8 @@ This is an **educational proof-of-concept** that shows:
 
 ## What This Is NOT
 
-❌ **Not a cryptocurrency miner** - Uses standard SHA-256 hashing for educational purposes only  
-❌ **Not profitable** - Browser-based computing is inefficient for real mining  
+❌ **Not a production cryptocurrency miner** - Uses RandomX simulation for educational purposes only  
+❌ **Not profitable** - Browser-based mining is inefficient compared to dedicated hardware  
 ❌ **Not stealth** - Requires explicit user consent before starting  
 ❌ **Not production mining software** - This is a learning tool, not a turnkey mining solution  
 
@@ -60,31 +61,47 @@ This is an **educational proof-of-concept** that shows:
    - Controls worker lifecycle
 
 2. **Web Workers**
-   - Run SHA-256 hash computations in parallel
+   - Initialize RandomX with 256MB memory scratchpad
+   - Run RandomX hash computations in parallel
    - Implement duty-cycle throttling (work/sleep)
    - Report statistics at regular intervals
 
-3. **Throttling System**
+3. **RandomX Algorithm**
+   - Memory-hard: Uses 256MB scratchpad (light mode)
+   - CPU-intensive: Multiple hashing rounds with VM simulation
+   - Initialization: 2-5 second cache setup
+   - Performance: ~10-200 H/s (much slower than SHA256 by design)
+
+4. **Throttling System**
    - Work for X ms, sleep for Y ms based on throttle percentage
    - Example: 30% throttle = 70ms work, 30ms sleep per 100ms cycle
 
-4. **Telemetry Aggregation**
+5. **Telemetry Aggregation**
    - Rolling window hashrate calculation
    - Per-worker health monitoring
    - Time-series data collection
+   - Memory usage tracking
 
 ## Browser Requirements
 
 - Modern browser with Web Worker support (Chrome, Firefox, Edge, Safari)
 - JavaScript enabled
-- Web Crypto API support (for SHA-256)
+- Sufficient memory (at least 512MB free RAM per worker)
+- Web Crypto API support (for SHA-256 operations within RandomX)
 
 **Note:** Performance varies significantly by:
 - Device CPU capabilities
+- Available RAM
 - Browser engine and version
 - Battery/power state
 - Thermal conditions
 - Background processes
+
+### RandomX-Specific Requirements
+
+- **Memory**: Each worker requires ~258MB RAM (256MB scratchpad + 2MB cache)
+- **Initialization**: Workers need 2-5 seconds to initialize before hashing begins
+- **Performance**: Expect 10-200 H/s total (vs 100K-1M+ H/s with previous SHA256)
 
 ## Usage Guide
 
@@ -130,19 +147,36 @@ This is an **educational proof-of-concept** that shows:
 
 ### Typical Performance Ranges
 
-| Device Type | Threads | Approx. Hashrate |
-|-------------|---------|------------------|
-| Mobile | 2-4 | 10K-100K H/s |
-| Laptop | 4-8 | 50K-500K H/s |
-| Desktop | 8 | 100K-1M+ H/s |
+**RandomX (Current Implementation)**
 
-*These are rough estimates. Actual results vary widely.*
+| Device Type | Threads | Approx. Hashrate (H/s) | Memory Usage |
+|-------------|---------|------------------------|--------------|
+| Mobile | 1-2 | 5-20 | 258-516MB |
+| Laptop | 2-4 | 20-100 | 516MB-1GB |
+| Desktop | 4-8 | 50-200 | 1-2GB |
+
+**Previous SHA256 Implementation** (for comparison)
+
+| Device Type | Threads | Approx. Hashrate (H/s) |
+|-------------|---------|------------------------|
+| Mobile | 2-4 | 10K-100K |
+| Laptop | 4-8 | 50K-500K |
+| Desktop | 8 | 100K-1M+ |
+
+*RandomX is intentionally ~1000-10000x slower than SHA256. This is by design to resist ASIC/GPU mining.*
 
 ## Browser Constraints
 
 ### Memory Limitations
-- Browsers restrict memory allocation to prevent crashes
-- Large allocations may fail on mobile devices
+- Each worker requires ~258MB RAM (RandomX light mode)
+- Browsers restrict total memory allocation to prevent crashes
+- Mobile devices may only support 1-2 workers due to memory limits
+- Desktop browsers can typically handle 2-8 workers
+
+### Initialization Overhead
+- RandomX requires 2-5 seconds to initialize per worker
+- Cache generation is CPU-intensive
+- Workers cannot hash until initialization completes
 
 ### Background Throttling
 - Hidden tabs are heavily throttled by browsers to save power
@@ -152,6 +186,7 @@ This is an **educational proof-of-concept** that shows:
 - Cannot read actual CPU temperature
 - Cannot disable OS-level thermal throttling
 - Cannot measure exact power consumption
+- Cannot use hardware AES instructions (WASM limitation)
 
 ### Sandboxed Execution
 - Workers run in isolated contexts for security
@@ -197,14 +232,16 @@ This tool exists to:
 ### Stack
 - **Frontend:** React + TypeScript
 - **Workers:** Vanilla JavaScript Web Workers
-- **Hashing:** Web Crypto API (SHA-256)
+- **Hashing:** RandomX-Lite simulation (memory-hard algorithm)
 - **UI:** shadcn/ui + Tailwind CSS
 - **Icons:** Phosphor Icons
 
 ### File Structure
 ```
 /public
-  /hash-worker.js          # Web Worker implementation
+  /wasm
+    randomx.js             # RandomX simulation module
+  hash-worker.js           # Web Worker implementation
 /src
   /components
     ConsentGate.tsx        # User consent UI
@@ -221,14 +258,16 @@ This tool exists to:
 ### Worker Communication Protocol
 
 **Messages to Worker:**
-- `INIT {workerId}` - Initialize worker
+- `INIT {workerId}` - Initialize worker with RandomX
 - `START {config}` - Begin hashing loop
 - `STOP` - Terminate execution
 - `UPDATE_CONFIG {throttle}` - Adjust throttling
+- `DESTROY` - Cleanup and release memory
 
 **Messages from Worker:**
-- `READY {workerId, capabilities}` - Initialization complete
-- `STATS {hashrate, totalHashes, ...}` - Performance update
+- `INIT_PROGRESS {progress, message}` - Initialization status
+- `READY {workerId, capabilities}` - Initialization complete (includes RandomX info)
+- `STATS {hashrate, totalHashes, memoryUsageMB, ...}` - Performance update
 - `ERROR {error, details}` - Error occurred
 - `STOPPED {totalHashes}` - Execution stopped
 
@@ -265,16 +304,19 @@ Exported JSON structure:
 1. **Browser Variability:** Results differ significantly across browsers
 2. **Thermal Throttling:** CPU may slow down during execution (undetectable)
 3. **Background Throttling:** Hidden tabs run at reduced speed
-4. **No GPU Acceleration:** Uses only CPU compute
+4. **No GPU Acceleration:** Uses only CPU compute (as designed for RandomX)
 5. **Overhead:** Worker coordination adds performance overhead
 6. **Precision:** Hashrate measurements are estimates
+7. **Memory Usage:** Each worker requires ~258MB RAM
+8. **Initialization Time:** 2-5 seconds delay before hashing begins
+9. **Simulation:** Uses RandomX-like algorithm, not official RandomX WASM
 
 ## Security Considerations
 
 ### Antivirus/Adblock
 Some security software may flag this as:
-- Cryptocurrency miner (it uses cryptographic functions)
-- Resource-intensive script (it intentionally uses CPU)
+- Cryptocurrency miner (it uses RandomX-like hashing)
+- Resource-intensive script (it intentionally uses CPU and RAM)
 
 This is a **false positive** - the code is:
 - Open source and auditable
@@ -287,6 +329,12 @@ This is a **false positive** - the code is:
 - **Local only:** All computation happens in your browser
 - **No cookies:** No persistent identifiers
 - **No network requests:** After page load, runs entirely offline
+
+## Related Documentation
+
+- [RANDOMX.md](./RANDOMX.md) - Detailed RandomX implementation notes
+- [ARCHITECTURE.md](./ARCHITECTURE.md) - Technical architecture documentation
+- [ETHICS.md](./ETHICS.md) - Ethical considerations and responsible use
 
 ## Contributing
 
@@ -307,10 +355,11 @@ MIT License - See LICENSE file for details
 
 ## Acknowledgments
 
-- Uses Web Crypto API for SHA-256 hashing
+- RandomX algorithm by tevador and contributors
+- Uses RandomX-Lite simulation for browser compatibility
 - Built with React and TypeScript
 - UI components from shadcn/ui
-- Educational resource inspired by browser computing research
+- Educational resource inspired by browser computing research and Monero's RandomX PoW
 
 ---
 

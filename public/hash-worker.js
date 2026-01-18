@@ -1,14 +1,68 @@
+// Import RandomX module
+importScripts('/wasm/randomx.js');
+
 let running = false;
 let totalHashes = 0;
 let workerId = null;
+let randomxModule = null;
+let initializationProgress = 0;
 
-async function sha256(data) {
-  const encoder = new TextEncoder();
-  const dataBuffer = encoder.encode(data);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
+/**
+ * Initialize RandomX module
+ */
+async function initializeRandomX(mode = 'light') {
+  try {
+    randomxModule = new RandomXModule(mode);
+    
+    // Generate a cryptographically secure seed
+    // In real mining, this comes from block template
+    const randomBytes = new Uint8Array(32);
+    crypto.getRandomValues(randomBytes);
+    
+    // Convert to hex efficiently
+    let hexSeed = '';
+    for (let i = 0; i < randomBytes.length; i++) {
+      hexSeed += randomBytes[i].toString(16).padStart(2, '0');
+    }
+    const seed = `randomx-seed-${hexSeed}-${workerId}`;
+    
+    // Initialize with progress reporting
+    const progressCallback = (progress, message) => {
+      self.postMessage({
+        type: 'INIT_PROGRESS',
+        workerId,
+        progress,
+        message
+      });
+    };
+    
+    progressCallback(0, 'Starting initialization...');
+    await randomxModule.init(seed, progressCallback);
+    
+    const memInfo = randomxModule.getMemoryInfo();
+    
+    self.postMessage({
+      type: 'INIT_PROGRESS',
+      workerId,
+      progress: 100,
+      message: `RandomX ${mode} mode initialized`,
+      memoryInfo: memInfo
+    });
+    
+    return memInfo;
+  } catch (error) {
+    throw new Error(`Failed to initialize RandomX: ${error.message}`);
+  }
+}
+
+/**
+ * Calculate RandomX hash
+ */
+async function randomxHash(input) {
+  if (!randomxModule || !randomxModule.initialized) {
+    throw new Error('RandomX not initialized');
+  }
+  return await randomxModule.calculateHash(input);
 }
 
 function sleep(ms) {
@@ -29,7 +83,7 @@ async function hashingLoop(config) {
     
     while (performance.now() - batchStart < workMs && running) {
       const input = `${workerId}-${totalHashes}-${Math.random()}`;
-      await sha256(input);
+      await randomxHash(input);  // Use RandomX instead of SHA256
       totalHashes++;
       batchHashes++;
       hashesSinceLastStats++;
@@ -38,6 +92,7 @@ async function hashingLoop(config) {
     const now = performance.now();
     if (now - lastStatsTime >= statsInterval) {
       const elapsedSec = (now - lastStatsTime) / 1000;
+      const memInfo = randomxModule ? randomxModule.getMemoryInfo() : null;
       self.postMessage({
         type: 'STATS',
         workerId,
@@ -45,7 +100,8 @@ async function hashingLoop(config) {
         elapsedMs: now - lastStatsTime,
         totalHashes,
         hashrate: hashesSinceLastStats / elapsedSec,
-        dutyCycle: (workMs / (workMs + sleepMs)) * 100
+        dutyCycle: (workMs / (workMs + sleepMs)) * 100,
+        memoryUsageMB: memInfo ? memInfo.totalMB : 0
       });
       lastStatsTime = now;
       hashesSinceLastStats = 0;
@@ -63,14 +119,28 @@ self.onmessage = async function(e) {
   switch (type) {
     case 'INIT':
       workerId = data.workerId;
-      self.postMessage({
-        type: 'READY',
-        workerId,
-        capabilities: {
-          cryptoSubtle: !!self.crypto?.subtle,
-          performance: !!self.performance
-        }
-      });
+      try {
+        // Support mode selection (default to 'light')
+        const mode = data.mode || 'light';
+        const memInfo = await initializeRandomX(mode);
+        self.postMessage({
+          type: 'READY',
+          workerId,
+          capabilities: {
+            randomx: true,
+            wasmSupport: typeof WebAssembly !== 'undefined',
+            mode: memInfo.mode,
+            memoryMB: memInfo.totalMB
+          }
+        });
+      } catch (error) {
+        self.postMessage({
+          type: 'ERROR',
+          workerId,
+          error: 'Failed to initialize RandomX: ' + error.message,
+          details: error.stack
+        });
+      }
       break;
       
     case 'START':
@@ -98,6 +168,18 @@ self.onmessage = async function(e) {
       break;
       
     case 'UPDATE_CONFIG':
+      break;
+      
+    case 'DESTROY':
+      running = false;
+      if (randomxModule) {
+        randomxModule.destroy();
+        randomxModule = null;
+      }
+      self.postMessage({
+        type: 'DESTROYED',
+        workerId
+      });
       break;
       
     default:
