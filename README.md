@@ -38,6 +38,8 @@ This is an **educational proof-of-concept** that shows:
 - Peak and average hashrate
 - Per-worker status monitoring
 - Elapsed time tracking
+- **Solutions found** (demonstrates difficulty checking)
+- **Cache reinitializations** (shows realistic mining interruptions)
 
 ### 📈 Benchmark Export
 - Download comprehensive JSON reports
@@ -71,6 +73,11 @@ This is an **educational proof-of-concept** that shows:
    - CPU-intensive: Multiple hashing rounds with VM simulation
    - Initialization: 2-5 second cache setup
    - Performance: ~10-200 H/s (much slower than SHA256 by design)
+   - **Realistic Mining Components:**
+     - **Block Headers**: 76-byte Monero-style headers with binary serialization
+     - **Sequential Nonce**: Workers iterate through partitioned nonce spaces
+     - **Difficulty Checking**: Every hash compared against target (realistic overhead)
+     - **Cache Reinitialization**: Periodic cache updates every 2 minutes (simulates blockchain height changes)
 
 4. **Throttling System**
    - Work for X ms, sleep for Y ms based on throttle percentage
@@ -81,6 +88,8 @@ This is an **educational proof-of-concept** that shows:
    - Per-worker health monitoring
    - Time-series data collection
    - Memory usage tracking
+   - Solutions found tracking (demonstrates difficulty system)
+   - Cache reinitialization monitoring (realistic mining interruptions)
 
 ## Browser Requirements
 

@@ -5,6 +5,8 @@ export interface WorkerStats {
   totalHashes: number;
   hashrate: number;
   dutyCycle: number;
+  solutionsFound?: number;
+  cacheReinitCount?: number;
 }
 
 export interface WorkerCapabilities {
@@ -45,6 +47,8 @@ export interface WorkerMessage {
     mode: string;
   };
   memoryUsageMB?: number;
+  solutionsFound?: number;
+  cacheReinitCount?: number;
 }
 
 export type WorkerState = 'idle' | 'initializing' | 'running' | 'error' | 'stopped';
@@ -56,6 +60,8 @@ export interface WorkerInfo {
   totalHashes: number;
   lastHashrate: number;
   error?: string;
+  solutionsFound?: number;
+  cacheReinitCount?: number;
 }
 
 export interface AggregatedStats {
@@ -66,6 +72,8 @@ export interface AggregatedStats {
   runningWorkers: number;
   erroredWorkers: number;
   elapsedTime: number;
+  totalSolutions?: number;
+  totalCacheReinits?: number;
 }
 
 export interface BenchmarkReport {

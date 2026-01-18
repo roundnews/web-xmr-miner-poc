@@ -28,7 +28,9 @@ export class WorkerCoordinator {
       state: 'initializing',
       worker: null,
       totalHashes: 0,
-      lastHashrate: 0
+      lastHashrate: 0,
+      solutionsFound: 0,
+      cacheReinitCount: 0
     }));
 
     const initPromises = this.workers.map(async (workerInfo) => {
@@ -50,6 +52,7 @@ export class WorkerCoordinator {
           type: 'INIT', 
           data: { 
             workerId: workerInfo.id,
+            totalWorkers: this.config.threads,
             mode: this.config.mode || 'light'
           } 
         });
@@ -161,6 +164,12 @@ export class WorkerCoordinator {
         if (message.hashrate !== undefined) {
           workerInfo.lastHashrate = message.hashrate;
         }
+        if (message.solutionsFound !== undefined) {
+          workerInfo.solutionsFound = message.solutionsFound;
+        }
+        if (message.cacheReinitCount !== undefined) {
+          workerInfo.cacheReinitCount = message.cacheReinitCount;
+        }
         break;
 
       case 'ERROR':
@@ -213,6 +222,9 @@ export class WorkerCoordinator {
       ? hashrates.reduce((sum, h) => sum + h, 0) / hashrates.length 
       : 0;
 
+    const totalSolutions = this.workers.reduce((sum, w) => sum + (w.solutionsFound || 0), 0);
+    const totalCacheReinits = this.workers.reduce((sum, w) => sum + (w.cacheReinitCount || 0), 0);
+
     return {
       totalHashes,
       currentHashrate,
@@ -220,7 +232,9 @@ export class WorkerCoordinator {
       avgHashrate,
       runningWorkers,
       erroredWorkers,
-      elapsedTime
+      elapsedTime,
+      totalSolutions,
+      totalCacheReinits
     };
   }
 
