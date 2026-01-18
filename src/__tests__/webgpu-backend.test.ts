@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { WorkerCoordinator } from '@/lib/coordinator';
 import { BenchmarkConfig } from '@/lib/types';
+import { createMockWorker } from './setup';
 
 describe('WebGPU Backend Tests', () => {
   let config: BenchmarkConfig;
@@ -37,17 +38,9 @@ describe('WebGPU Backend Tests', () => {
       const originalWorker = global.Worker;
       const workerPaths: string[] = [];
       
-      global.Worker = class MockWorker {
-        constructor(public url: string) {
-          workerPaths.push(url);
-        }
-        postMessage() {}
-        terminate() {}
-        addEventListener() {}
-        removeEventListener() {}
-        onmessage: ((ev: MessageEvent) => void) | null = null;
-        onerror: ((ev: ErrorEvent) => void) | null = null;
-      } as any;
+      global.Worker = createMockWorker({
+        onConstruct: (url) => workerPaths.push(url)
+      });
 
       try {
         const coordinator = new WorkerCoordinator(config);
@@ -65,17 +58,9 @@ describe('WebGPU Backend Tests', () => {
       const originalWorker = global.Worker;
       const workerPaths: string[] = [];
       
-      global.Worker = class MockWorker {
-        constructor(public url: string) {
-          workerPaths.push(url);
-        }
-        postMessage() {}
-        terminate() {}
-        addEventListener() {}
-        removeEventListener() {}
-        onmessage: ((ev: MessageEvent) => void) | null = null;
-        onerror: ((ev: ErrorEvent) => void) | null = null;
-      } as any;
+      global.Worker = createMockWorker({
+        onConstruct: (url) => workerPaths.push(url)
+      });
 
       try {
         const coordinator = new WorkerCoordinator(config);
@@ -94,24 +79,9 @@ describe('WebGPU Backend Tests', () => {
       
       const originalWorker = global.Worker;
       
-      global.Worker = class MockWorker {
-        constructor(public url: string) {
-          // Simulate error after construction
-          setTimeout(() => {
-            if (this.onerror) {
-              this.onerror(new ErrorEvent('error', {
-                message: 'WebGPU not supported'
-              }));
-            }
-          }, 10);
-        }
-        postMessage() {}
-        terminate() {}
-        addEventListener() {}
-        removeEventListener() {}
-        onmessage: ((ev: MessageEvent) => void) | null = null;
-        onerror: ((ev: ErrorEvent) => void) | null = null;
-      } as any;
+      global.Worker = createMockWorker({
+        simulateError: true
+      });
 
       try {
         coordinator.initialize();
@@ -133,17 +103,9 @@ describe('WebGPU Backend Tests', () => {
       let terminateCalled = false;
       const originalWorker = global.Worker;
       
-      global.Worker = class MockWorker {
-        constructor(public url: string) {}
-        postMessage() {}
-        terminate() {
-          terminateCalled = true;
-        }
-        addEventListener() {}
-        removeEventListener() {}
-        onmessage: ((ev: MessageEvent) => void) | null = null;
-        onerror: ((ev: ErrorEvent) => void) | null = null;
-      } as any;
+      global.Worker = createMockWorker({
+        onTerminate: () => { terminateCalled = true; }
+      });
 
       try {
         coordinator.initialize();

@@ -21,3 +21,47 @@ if (typeof Worker === 'undefined') {
     onerror = null;
   } as any;
 }
+
+// Helper function to create a mock Worker for testing
+export function createMockWorker(options: {
+  onConstruct?: (url: string) => void;
+  onTerminate?: () => void;
+  simulateReady?: boolean;
+  simulateError?: boolean;
+} = {}) {
+  return class MockWorker {
+    constructor(public url: string) {
+      if (options.onConstruct) {
+        options.onConstruct(url);
+      }
+      if (options.simulateReady) {
+        setTimeout(() => {
+          if (this.onmessage) {
+            this.onmessage(new MessageEvent('message', {
+              data: { type: 'READY', workerId: 0 }
+            }));
+          }
+        }, 10);
+      }
+      if (options.simulateError) {
+        setTimeout(() => {
+          if (this.onerror) {
+            this.onerror(new ErrorEvent('error', {
+              message: 'Test error'
+            }));
+          }
+        }, 10);
+      }
+    }
+    postMessage() {}
+    terminate() {
+      if (options.onTerminate) {
+        options.onTerminate();
+      }
+    }
+    addEventListener() {}
+    removeEventListener() {}
+    onmessage: ((ev: MessageEvent) => void) | null = null;
+    onerror: ((ev: ErrorEvent) => void) | null = null;
+  } as any;
+}

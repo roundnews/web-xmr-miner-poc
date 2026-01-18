@@ -108,7 +108,7 @@ describe('Hash Validation Tests', () => {
       const malformedHashes = [
         'not-a-hash',
         '12345',
-        'GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG',
+        'gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg', // lowercase g is invalid hex
       ];
 
       const hexRegex = /^[0-9a-f]{64}$/;
