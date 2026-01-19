@@ -2,6 +2,13 @@
 
 This document provides a comprehensive manual testing checklist for the WebGPU backend implementation in the Web XMR Miner POC.
 
+## Screenshots
+
+For visual reference of the expected UI states, see the [Screenshots section in the README](../README.md#screenshots). Key screenshots include:
+- Backend selector dropdown showing WASM and WebGPU options
+- WebGPU backend selected in the control panel
+- UI overview with all controls and telemetry dashboard
+
 ## Prerequisites
 
 - Modern browser with WebGPU support (Chrome 113+, Edge 113+)
@@ -86,6 +93,8 @@ All automated tests should pass before proceeding with manual testing.
 
 ### 3. UI Backend Selection
 
+> **Visual Reference**: See [screenshots/webgpu-backend-selector-dropdown.png](screenshots/webgpu-backend-selector-dropdown.png) and [screenshots/webgpu-backend-selected-ui.png](screenshots/webgpu-backend-selected-ui.png) for expected UI appearance.
+
 #### Test 3.1: Backend Dropdown Visibility
 - [ ] Verify "Compute Backend" label is visible in Control Panel
 - [ ] Verify dropdown shows current selection
@@ -93,6 +102,7 @@ All automated tests should pass before proceeding with manual testing.
 - [ ] Verify two options are visible:
   - [ ] "WASM (CPU)"
   - [ ] "WebGPU (GPU) - Educational"
+- [ ] Compare UI with reference screenshot: `docs/screenshots/webgpu-backend-selector-dropdown.png`
 
 **Expected Result**: Both backend options are clearly presented
 

@@ -125,6 +125,7 @@ This is an **educational proof-of-concept** that shows:
 - **GPU Memory**: Sufficient VRAM for 256MB+ buffers
 - **Note**: WebGPU backend is **intentionally slower** than WASM to demonstrate RandomX's CPU-friendly design
 - **Educational Purpose**: Use WebGPU to understand why GPUs are inefficient for RandomX
+- **UI Screenshots**: See the [Screenshots](#screenshots) section below for WebGPU interface examples
 
 ## Usage Guide
 
@@ -161,6 +162,33 @@ This is an **educational proof-of-concept** that shows:
 - **Battery drain:** Benchmarks consume significant power on mobile devices
 - **Start small:** Test with short durations before extending
 - **Background throttling:** Hidden tabs may reduce performance significantly
+
+## Screenshots
+
+### User Interface Overview
+
+The application provides a clean interface with consent controls, benchmark configuration, and real-time telemetry:
+
+![UI Overview](docs/screenshots/ui-overview-with-controls.png)
+
+### Backend Selection
+
+Users can choose between WASM (CPU) and WebGPU (GPU) backends for educational comparison:
+
+![Backend Selector Dropdown](docs/screenshots/webgpu-backend-selector-dropdown.png)
+
+### WebGPU Backend Interface
+
+When WebGPU backend is selected, the interface clearly indicates the choice and provides educational context about expected performance:
+
+![WebGPU Backend Selected](docs/screenshots/webgpu-backend-selected-ui.png)
+
+**Key Features Shown:**
+- Backend selector dropdown with both WASM and WebGPU options
+- Educational note explaining WebGPU's lower performance for RandomX
+- Control panel with worker threads, throttle, and duration settings
+- Live telemetry dashboard showing hashrate, total hashes, and other metrics
+- Worker status monitoring
 
 ## Understanding Results
 
