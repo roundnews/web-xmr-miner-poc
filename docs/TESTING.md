@@ -102,7 +102,7 @@ All automated tests should pass before proceeding with manual testing.
 - [ ] Verify two options are visible:
   - [ ] "WASM (CPU)"
   - [ ] "WebGPU (GPU) - Educational"
-- [ ] Compare UI with reference screenshot: `docs/screenshots/webgpu-backend-selector-dropdown.png`
+- [ ] Compare UI with reference screenshot: `screenshots/webgpu-backend-selector-dropdown.png`
 
 **Expected Result**: Both backend options are clearly presented
 
